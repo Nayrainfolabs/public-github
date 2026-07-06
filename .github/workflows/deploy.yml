@@ -1,21 +1,50 @@
-name: Deploy After Approval Test
+name: Deploy Only After Romeet Approval
 
 on:
-  push:
+  pull_request:
     branches:
       - main
+    types:
+      - closed
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
-  deploy:
+  verify-and-deploy:
+    # Run only when the PR was merged, not when it was closed without merging.
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout merged main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
 
-      - name: Test deployment
+      - name: Verify Romeet approved the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_APPROVER: romeet-nayrainfolabs
         run: |
-          echo "Approved pull request merged into main."
-          echo "Deployment test completed."
+          echo "Checking approvals for PR #${PR_NUMBER}"
+
+          APPROVED_BY_ROMEET=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
+            --paginate \
+            --jq '.[] | select(.user.login == env.EXPECTED_APPROVER and .state == "APPROVED") | .user.login' \
+            | head -n 1)
+
+          if [ "$APPROVED_BY_ROMEET" != "$EXPECTED_APPROVER" ]; then
+            echo "Deployment blocked: ${EXPECTED_APPROVER} did not approve this PR."
+            exit 1
+          fi
+
+          echo "Verified: ${EXPECTED_APPROVER} approved this PR."
+
+      - name: Deploy
+        run: |
+          echo "Romeet approval verified. Starting deployment."
+          # Add your real deployment commands here.
