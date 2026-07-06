@@ -1,0 +1,21 @@
+name: Deploy After Approval Test
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test deployment
+        run: |
+          echo "Approved pull request merged into main."
+          echo "Deployment test completed."
